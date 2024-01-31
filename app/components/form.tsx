@@ -3,14 +3,32 @@ import * as Yup from "yup";
 import { Form, Formik, Field, ErrorMessage } from "formik";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import Image from "next/image";
+import CryptoJS from "crypto-js";
+import { addDoc, collection } from "firebase/firestore";
+import { app, db } from "../lib/firebase";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { Loader2 } from "lucide-react";
 
 type Props = {
 	field: {};
+};
+
+type ValuesProps = {
+	case: String;
+	description: String;
+	incidentDate: String;
+	location: String;
 };
 
 export default function FormFields() {
@@ -18,6 +36,10 @@ export default function FormFields() {
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
 	const [videoUri, setVidoeUri] = useState("");
+	const [vidUrl, setVidUrl] = useState("");
+	const [imgUrl, setImgUrl] = useState("");
+	const [msg, setMsg] = useState("");
+	const [submiting, setSubmiting] = useState(false);
 
 	const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -42,7 +64,49 @@ export default function FormFields() {
 		incidentDate: "",
 		location: "",
 	};
-	const onSubmit = () => {};
+	const storage = getStorage(app);
+	const colRef = collection(db, "reports");
+	const storageRef = ref(storage, "files");
+	const onSubmit = async (values: ValuesProps, helpers: any) => {
+		setSubmiting(true);
+		try {
+			if (image) {
+				const imageRef = ref(storageRef, `images/${image.name}`);
+				await uploadBytes(imageRef, image);
+				const imageUrl = await getDownloadURL(imageRef);
+				setImgUrl(imageUrl);
+			}
+
+			// Upload video file if provided
+
+			if (selectedVideo) {
+				const videoRef = ref(storageRef, `videos/${selectedVideo.name}`);
+				await uploadBytes(videoRef, selectedVideo);
+				const videoUrl = await getDownloadURL(videoRef);
+				setVidUrl(videoUrl);
+			}
+
+			const formData = {
+				case: values.case,
+				location: values.location,
+				incidentDate: values.incidentDate,
+				description: values.description,
+				imageUrl: imgUrl || null,
+				videoUrl: vidUrl || null,
+			};
+			await addDoc(colRef, formData).then((info) => {
+				// console.log(info);
+				setMsg("Successfully Submited your Report");
+				helpers.resetForm();
+				setPreviewUrl("");
+				setVidoeUri("");
+				setSubmiting(false);
+			});
+		} catch (error) {
+			setMsg("An Error Occured Whild uploading the report");
+			setSubmiting(false);
+		}
+	};
 	const validationSchema = Yup.object({
 		case: Yup.string().required("Please Provide the case title"),
 		description: Yup.string().required(
@@ -60,6 +124,7 @@ export default function FormFields() {
 			<Card className="lg:w-[750px] w-full lg:h-[500px] flex flex-col">
 				<CardHeader>
 					<CardTitle className="text-center">Ichalo Bantu</CardTitle>
+					<CardDescription>{msg}</CardDescription>
 				</CardHeader>
 				<CardContent className="lg:flex flex flex-col lg:flex-row gap-10">
 					<Formik
@@ -74,6 +139,11 @@ export default function FormFields() {
 										<>
 											<Label htmlFor="case">Case Type</Label>
 											<Input placeholder="case type e.g murder" {...field} />
+											<ErrorMessage name="case">
+												{(msg) => (
+													<h1 className="text-red-400 text-[10px]">{msg}</h1>
+												)}
+											</ErrorMessage>
 										</>
 									);
 								}}
@@ -85,6 +155,11 @@ export default function FormFields() {
 										<>
 											<Label htmlFor="case">Description</Label>
 											<Textarea placeholder="Case Description" {...field} />
+											<ErrorMessage name="description">
+												{(msg) => (
+													<h1 className="text-red-400 text-[10px]">{msg}</h1>
+												)}
+											</ErrorMessage>
 										</>
 									);
 								}}
@@ -94,8 +169,13 @@ export default function FormFields() {
 									const { field } = props;
 									return (
 										<>
-											<Label htmlFor="case">Incident Date</Label>
+											<Label htmlFor="date">Incident Date</Label>
 											<Input type="date" {...field} />
+											<ErrorMessage name="incidentDate">
+												{(msg) => (
+													<h1 className="text-red-400 text-[10px]">{msg}</h1>
+												)}
+											</ErrorMessage>
 										</>
 									);
 								}}
@@ -105,16 +185,30 @@ export default function FormFields() {
 									const { field } = props;
 									return (
 										<>
-											<Label htmlFor="case">Location </Label>
+											<Label htmlFor="location">Location </Label>
 											<Input
 												placeholder="lusaka, matero house no.12"
 												{...field}
 											/>
+											<ErrorMessage name="location">
+												{(msg) => (
+													<h1 className="text-red-400 text-[10px]">{msg}</h1>
+												)}
+											</ErrorMessage>
 										</>
 									);
 								}}
 							</Field>
-							<Button variant={"outline"}>Submit</Button>
+							<Button type="submit" variant={"outline"}>
+								{submiting ? (
+									<div className="flex gap-2">
+										Submiting
+										<Loader2 />
+									</div>
+								) : (
+									"Submit"
+								)}
+							</Button>
 						</Form>
 					</Formik>
 					<div className="flex pt-5 lg:pt-0 flex-col gap-2">
@@ -148,7 +242,7 @@ export default function FormFields() {
 								</>
 							)}
 						</Card>
-						<Card className="h-[200px]">
+						<Card>
 							{videoUri ? (
 								<video className="h-[200px] w-full" src={videoUri} controls />
 							) : (
@@ -160,7 +254,6 @@ export default function FormFields() {
 									</CardHeader>
 									<CardContent>
 										<Input
-											className="h-[200px]"
 											onChange={handleVideoChange}
 											accept="video/*"
 											type="file"
