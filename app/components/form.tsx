@@ -123,7 +123,11 @@ export default function FormFields() {
 		<div className="flex justify-center items-center flex-col lg:h-screen  w-full">
 			<Card className="lg:w-[750px] w-full lg:h-[500px] flex flex-col">
 				<CardHeader>
-					<CardTitle className="text-center">Ichalo Bantu</CardTitle>
+					<div className="flex items-center">
+						<Image alt="logo" width={60} height={60} src={"/ichalo-1.jpg"} />
+						<CardTitle className="text-center">Ichalo Bantu</CardTitle>
+					</div>
+
 					<CardDescription>{msg}</CardDescription>
 				</CardHeader>
 				<CardContent className="lg:flex flex flex-col lg:flex-row gap-10">
